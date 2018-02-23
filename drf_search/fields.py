@@ -21,7 +21,8 @@ VALID_LOOKUPS = [
 
 
 class SearchField(object):
-    def __init__(self, field_name, field_lookup=None, validators=None, default=False, match_case=None):
+    def __init__(self, field_name, field_lookup=None, validators=None,
+                 default=False, match_case=None, aliases=None):
         self.field_name = field_name
         self.field_lookup = "icontains" if not match_case else "contains"
         if field_lookup is not None:
@@ -34,6 +35,9 @@ class SearchField(object):
         self._validators = []
         if validators is not None:
             self._validators = validators if isinstance(validators, list) else [validators]
+        self.aliases = []
+        if aliases is not None:
+            self.aliases = aliases if isinstance(aliases, list) else [aliases]
 
     def __str__(self):
         return self.constructed
