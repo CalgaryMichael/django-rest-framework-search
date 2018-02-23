@@ -8,7 +8,7 @@ import unittest
 from drf_search import validators
 
 
-class ValidateNumerical(unittest.TestCase):
+class ValidateNumericalTests(unittest.TestCase):
     def test_validate(self):
         self.assertTrue(validators.validate_numerical(123))
         self.assertTrue(validators.validate_numerical("123"))
@@ -19,7 +19,28 @@ class ValidateNumerical(unittest.TestCase):
         self.assertFalse(validators.validate_numerical((123,)))
 
 
-class ValidateList(unittest.TestCase):
+class ValidateBooleanTests(unittest.TestCase):
+    def test_validate(self):
+        # with boolean True
+        self.assertTrue(validators.validate_boolean(True))
+        self.assertTrue(validators.validate_boolean("True"))
+        self.assertTrue(validators.validate_boolean("tRuE"))
+        self.assertTrue(validators.validate_boolean(1))
+
+        # with boolean False
+        self.assertTrue(validators.validate_boolean(False))
+        self.assertTrue(validators.validate_boolean("False"))
+        self.assertTrue(validators.validate_boolean("fAlSe"))
+        self.assertTrue(validators.validate_boolean(0))
+
+        # things that won't work
+        self.assertFalse(validators.validate_boolean(2))
+        self.assertFalse(validators.validate_boolean([]))
+        self.assertFalse(validators.validate_boolean("Jazz"))
+
+
+
+class ValidateListTests(unittest.TestCase):
     def test_validate(self):
         self.assertTrue(validators.validate_list([1, 2, 3]))
         self.assertTrue(validators.validate_list("[1, 2, 3]"))

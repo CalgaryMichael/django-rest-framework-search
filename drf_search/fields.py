@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from .validators import validate_list, validate_numerical
+from .validators import validate_list, validate_numerical, validate_boolean
 
 VALID_LOOKUPS = [
     "exact", "iexact",
@@ -21,13 +21,14 @@ VALID_LOOKUPS = [
 
 
 class SearchField(object):
-    def __init__(self, field_name, field_lookup=None, validators=None, default=False):
+    def __init__(self, field_name, field_lookup=None, validators=None, default=False, match_case=None):
         self.field_name = field_name
-        self.field_lookup = "icontains"
+        self.field_lookup = "icontains" if not match_case else "contains"
         if field_lookup is not None:
             # check to see if lookups are chained
             if all(lookup in VALID_LOOKUPS for lookup in field_lookup.split("__")):
                 self.field_lookup = field_lookup
+        self.match_case = match_case
         self.default = default
         self._constructed = None
         self._validators = []
@@ -51,36 +52,43 @@ class SearchField(object):
 
 
 class ExactSearchField(SearchField):
-    def __init__(self, match_case=True, *args, **kwargs):
+    def __init__(self, field_name, match_case=True, **kwargs):
         kwargs["field_lookup"] = "iexact"
         if match_case is True:
             kwargs["field_lookup"] = "exact"
-        super(ExactSearchField, self).__init__(field_lookup=field_lookup, *args, **kwargs)
+        super(ExactSearchField, self).__init__(field_name, match_case=match_case, **kwargs)
 
 
 class ContainsSearchField(SearchField):
-    def __init__(self, match_case=False, *args, **kwargs):
+    def __init__(self, field_name, match_case=False, **kwargs):
         kwargs["field_lookup"] = "icontains"
         if match_case is True:
             kwargs["field_lookup"] = "contains"
-        super(ContainsSearchField, self).__init__(field_lookup=field_lookup, *args, **kwargs)
+        super(ContainsSearchField, self).__init__(field_name, match_case=match_case, **kwargs)
 
 
 class RegexSearchField(SearchField):
-    def __init__(self, match_case=True, *args, **kwargs):
+    def __init__(self, field_name, match_case=True, **kwargs):
         kwargs["field_lookup"] = "iregex"
         if match_case is True:
             kwargs["field_lookup"] = "regex"
-        super(RegexSearchField, self).__init__(field_lookup=field_lookup, *args, **kwargs)
+        super(RegexSearchField, self).__init__(field_name, match_case=match_case, **kwargs)
 
 
 class IntegerSearchField(SearchField):
-    def __init__(self, field_lookup="exact", *args, **kwargs):
-        super(IntegerSearchField, self).__init__(field_lookup=field_lookup, *args, **kwargs)
+    def __init__(self, field_name, field_lookup="exact", **kwargs):
+        super(IntegerSearchField, self).__init__(field_name, field_lookup=field_lookup, **kwargs)
         self._validators = [validate_numerical] + self._validators
 
 
+class BooleanSearchField(SearchField):
+    def __init__(self, field_name, field_lookup="iexact", **kwargs):
+        super(BooleanSearchField, self).__init__(field_name, field_lookup=field_lookup, **kwargs)
+        self._validators = [validate_boolean] + self._validators
+
+
 class ListSearchField(SearchField):
-    def __init__(self, *args, **kwargs):
-        super(ListSearchField, self).__init__(field_lookup="in", *args, **kwargs)
+    def __init__(self, field_name, **kwargs):
+        kwargs["field_lookup"] = "in"
+        super(ListSearchField, self).__init__(field_name, **kwargs)
         self._validators = [validate_list] + self._validators

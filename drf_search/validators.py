@@ -27,3 +27,16 @@ def validate_list(x):
         except:
             return False
     return False
+
+
+def validate_boolean(x):
+    if isinstance(x, bool):
+        return True
+    if isinstance(x, six.string_types):
+        if x.lower() in ["true", "false"]:
+            return True
+    if isinstance(x, int):
+        # int should not be treated as boolean, but Python does, so we might as well
+        if x == 0 or x == 1:
+            return True
+    return False
