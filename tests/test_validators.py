@@ -6,9 +6,10 @@ from __future__ import unicode_literals
 
 import unittest
 from drf_search import validators
+from django.test import TestCase
 
 
-class ValidateNumericalTests(unittest.TestCase):
+class ValidateNumericalTests(TestCase):
     def test_validate(self):
         self.assertTrue(validators.validate_numerical(123))
         self.assertTrue(validators.validate_numerical("123"))
@@ -19,7 +20,7 @@ class ValidateNumericalTests(unittest.TestCase):
         self.assertFalse(validators.validate_numerical((123,)))
 
 
-class ValidateBooleanTests(unittest.TestCase):
+class ValidateBooleanTests(TestCase):
     def test_validate(self):
         # with boolean True
         self.assertTrue(validators.validate_boolean(True))
@@ -39,8 +40,7 @@ class ValidateBooleanTests(unittest.TestCase):
         self.assertFalse(validators.validate_boolean("Jazz"))
 
 
-
-class ValidateListTests(unittest.TestCase):
+class ValidateListTests(TestCase):
     def test_validate(self):
         self.assertTrue(validators.validate_list([1, 2, 3]))
         self.assertTrue(validators.validate_list("[1, 2, 3]"))

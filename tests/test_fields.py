@@ -7,9 +7,10 @@ from __future__ import unicode_literals
 import unittest
 from mock import patch
 from drf_search import fields, validators
+from django.test import TestCase
 
 
-class SearchFieldTest(unittest.TestCase):
+class SearchFieldTest(TestCase):
     def test_base(self):
         """base test, no extra frills"""
         field = fields.SearchField("pk")
@@ -94,7 +95,7 @@ class SearchFieldTest(unittest.TestCase):
         self.assertEqual(field._constructed, expected_constructed)
 
 
-class ExactSearchFieldTests(unittest.TestCase):
+class ExactSearchFieldTests(TestCase):
     def test_simple(self):
         # basic, no frills
         field = fields.ExactSearchField("pk")
@@ -118,7 +119,7 @@ class ExactSearchFieldTests(unittest.TestCase):
         self.assertEqual(field.field_lookup, "iexact")
 
 
-class ContainsSearchFieldTests(unittest.TestCase):
+class ContainsSearchFieldTests(TestCase):
     def test_simple(self):
         # basic, no frills
         field = fields.ContainsSearchField("pk")
@@ -142,7 +143,7 @@ class ContainsSearchFieldTests(unittest.TestCase):
         self.assertEqual(field.field_lookup, "contains")
 
 
-class RegexSearchFieldTests(unittest.TestCase):
+class RegexSearchFieldTests(TestCase):
     def test_simple(self):
         # basic, no frills
         field = fields.RegexSearchField("pk")
@@ -166,7 +167,7 @@ class RegexSearchFieldTests(unittest.TestCase):
         self.assertEqual(field.field_lookup, "iregex")
 
 
-class IntegerSearchFieldTests(unittest.TestCase):
+class IntegerSearchFieldTests(TestCase):
     def test_simple(self):
         field = fields.IntegerSearchField("pk")
         self.assertEqual(field.field_name, "pk")
@@ -193,7 +194,7 @@ class IntegerSearchFieldTests(unittest.TestCase):
         self.assertTrue(field.is_valid("9780123456789"))
 
 
-class BooleanSearchFieldTests(unittest.TestCase):
+class BooleanSearchFieldTests(TestCase):
     def test_simple(self):
         field = fields.BooleanSearchField("pk")
         self.assertEqual(field.field_name, "pk")
@@ -226,7 +227,7 @@ class BooleanSearchFieldTests(unittest.TestCase):
         self.assertFalse(field.is_valid("abc"))
 
 
-class ListSearchFieldTests(unittest.TestCase):
+class ListSearchFieldTests(TestCase):
     def test_simple(self):
         field = fields.ListSearchField("pk")
         self.assertEqual(field.field_name, "pk")
