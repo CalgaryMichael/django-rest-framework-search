@@ -45,7 +45,7 @@ class SearchFilterMetaclass(type):
 
     @classmethod
     def _get_default_search_fields(cls, search_fields):
-        return list(
+        return OrderedDict(
             (field_name, field) for field_name, field
             in search_fields
             if field.default is True)

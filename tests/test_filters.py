@@ -127,4 +127,24 @@ class SearchFilterMetaclassTest(TestCase):
             ("field3", fields.ExactSearchField("something"))]
         search_fields = filters.SearchFilterMetaclass._get_default_search_fields(attrs)
         self.assertEqual(len(search_fields), 1)
-        self.assertEqual(search_fields, [attrs[1]])
+        self.assertEqual(search_fields, OrderedDict([attrs[1]]))
+
+    def test_get_default_search_fields__with_aliases(self):
+        test_fields = {
+            "field1": fields.SearchField("pk", field_lookup="istartswith"),
+            "field2": fields.ExactSearchField("name", match_case=False, default=True, aliases="f2"),
+            "field3": fields.ExactSearchField("something")
+        }
+
+        attrs = [
+            ("field1", test_fields["field1"]),
+            ("field2", test_fields["field2"]),
+            ("f2", test_fields["field2"]),
+            ("field3", test_fields["field3"])]
+        search_fields = filters.SearchFilterMetaclass._get_default_search_fields(attrs)
+        self.assertEqual(len(search_fields), 2)
+
+        expected_fields = OrderedDict([
+            ("field2", test_fields["field2"]),
+            ("f2", test_fields["field2"])])
+        self.assertEqual(search_fields, expected_fields)
