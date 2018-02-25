@@ -40,6 +40,16 @@ class ValidateBooleanTests(TestCase):
         self.assertFalse(validators.validate_boolean("Jazz"))
 
 
+class ValidateEmailTests(TestCase):
+    def test_validate(self):
+        self.assertTrue(validators.validate_email("miles.davis@jazz.com"))
+        self.assertTrue(validators.validate_email("a@b.c"))
+
+        self.assertFalse(validators.validate_email("miles.davis"))
+        self.assertFalse(validators.validate_boolean("miles.davis@"))
+        self.assertFalse(validators.validate_boolean("miles.davis@jazz"))
+
+
 class ValidateListTests(TestCase):
     def test_validate(self):
         self.assertTrue(validators.validate_list([1, 2, 3]))

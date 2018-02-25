@@ -36,7 +36,7 @@ def validate_boolean(x):
     if isinstance(x, bool):
         return True
     if isinstance(x, six.string_types):
-        if x.lower() in ["true", "false"]:
+        if x.lower() in ["true", "false", "0", "1"]:
             return True
     if isinstance(x, int):
         # int should not be treated as boolean, but Python does, so we might as well
