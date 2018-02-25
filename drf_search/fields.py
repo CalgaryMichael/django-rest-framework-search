@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from .validators import validate_list, validate_numerical, validate_boolean
+from .validators import validate_list, validate_numerical, validate_boolean, validate_email
 
 VALID_LOOKUPS = [
     "exact", "iexact",
@@ -86,6 +86,16 @@ class RegexSearchField(SearchField):
         if match_case is True:
             kwargs["field_lookup"] = "regex"
         super(RegexSearchField, self).__init__(field_name, match_case=match_case, **kwargs)
+
+
+class EmailSearchField(SearchField):
+    def __init__(self, field_name, partial=False, match_case=False, **kwargs):
+        kwargs["field_lookup"] = "icontains"
+        if match_case is True:
+            kwargs["field_lookup"] = "contains"
+        super(EmailSearchField, self).__init__(field_name, match_case=match_case, **kwargs)
+        if partial is False:
+            self._validators = [validate_email] + self._validators
 
 
 class IntegerSearchField(SearchField):

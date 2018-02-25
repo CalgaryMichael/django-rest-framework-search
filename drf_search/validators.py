@@ -4,8 +4,11 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import re
 import six
 import json
+
+EMAIL_REGEX = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
 
 def validate_numerical(x):
@@ -40,3 +43,7 @@ def validate_boolean(x):
         if x == 0 or x == 1:
             return True
     return False
+
+
+def validate_email(x):
+    return isinstance(x, six.string_types) and EMAIL_REGEX.match(x)
