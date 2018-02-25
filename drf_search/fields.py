@@ -42,6 +42,15 @@ class SearchField(object):
     def __str__(self):
         return self.constructed
 
+    def __deepcopy__(self, *args):
+        return type(self)(
+            self.field_name,
+            field_lookup=self.field_lookup,
+            default=self.default,
+            match_case=self.match_case,
+            validators=list(v for v in self._validators),
+            aliases=list(a for a in self.aliases))
+
     @property
     def constructed(self):
         if self._constructed is None:
