@@ -54,6 +54,7 @@ class BaseSearchFilter(rest_framework.filters.SearchFilter):
 
     @property
     def default_fields(self):
+        """Returns all fields marked as default on the filter"""
         if self._defaults is None:
             self._defaults = OrderedDict(
                 (field_name, field) for field_name, field
@@ -78,13 +79,20 @@ class BaseSearchFilter(rest_framework.filters.SearchFilter):
         # in the resulting queryset.
         return rest_framework.compat.distinct(queryset, base)
 
-    def construct_search(self, field):
-        # in case this is every passed one of our fields
-        if isinstance(field, fields.SearchField):
-            return field.constructed
-        return super(BaseSearchFilter, self).construct_search(six.string_types(field))
-
     def construct_field_name(self, field_name):
+        """
+        Called on field names parsed from the search string.
+        If the field name is erroneously typed (such as with excessive spaces),
+        than this should be called to normalize the field name.
+        This is useful as a way to have your field names more human readable.
+
+        Example:
+            input -> 'first name'
+            output -> 'first_name'
+
+        :param field_name: (str) the name of the field that was parsed from user input
+        :return: (str) the repaired string
+        """
         return "_".join(field_name.split())
 
     def filter_searching(self, request):
@@ -107,6 +115,16 @@ class BaseSearchFilter(rest_framework.filters.SearchFilter):
         return split_terms
 
     def _validate_fields(self, field_names, search_term):
+        """
+        Converts the str names of the fields to the SearchField objects.
+        Returns a set of all the associated fields that are passed that are valid
+        for the search term.
+
+        :param field_names: an iterable of names/aliases of SearchFields for this filter
+        :param search_term: a string of the search term that the fields will be searching for.
+        :raises: AttributeError if a field name with no association is passed in
+        :return: set
+        """
         valid_fields = set()
         for field_name in field_names:
             search_field = self._search_fields.get(field_name)
