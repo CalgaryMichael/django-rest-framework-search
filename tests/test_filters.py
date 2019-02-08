@@ -7,9 +7,9 @@ from __future__ import unicode_literals
 import six
 import mock
 from contextlib import contextmanager
-from collections import OrderedDict
 from drf_search import filters, fields
 from django.test import TestCase
+from rest_framework.exceptions import NotFound, ParseError
 
 
 class TestFilter(filters.BaseSearchFilter):
@@ -17,6 +17,7 @@ class TestFilter(filters.BaseSearchFilter):
     title = fields.SearchField("title", field_lookup="icontains")
     email = fields.SearchField("user__email", default=True, aliases="@",
                                validators=lambda x: not x.isdigit())
+    contributor = fields.SearchField("contributors__display_name")
 
 
 @contextmanager
@@ -32,15 +33,6 @@ class BaseFilterTest(TestCase):
 
     def _get_field_names(self, fields):
         return list(field.field_name for field in fields)
-
-    def run_filter_searching(self, *terms):
-        with mock_search_terms(*terms):
-            return self.filterer.filter_searching(None)
-
-    def run_filter_queryset(self, *terms):
-        queryset = None  # TODO figure out how to do this. Prop up a db, I guess?
-        with mock_search_terms(*terms):
-            return self.filterer.filter_queryset(None, queryset)
 
     def run_filter_searching(self, *args):
         with mock.patch("drf_search.filters.BaseSearchFilter.split_terms") as mock_split:
@@ -104,7 +96,7 @@ class SearchFilterMetaclassTest(TestCase):
         search_fields = filters.SearchFilterMetaclass._get_search_fields(bases, dict(attrs))
         self.assertEqual(len(search_fields), 6)
 
-        expected_fields = ["fieldA", "fieldB", "fieldZ", "field2", "field1", "sharedfield"]
+        expected_fields = ["fieldA", "fieldZ", "fieldB", "field2", "field1", "sharedfield"]
         self.assertEqual(list(search_fields.keys()), expected_fields)
 
     def test_get_search_fields__with_bases__with_aliases(self):
@@ -136,30 +128,22 @@ class SearchFilterMetaclassTest(TestCase):
         search_fields = filters.SearchFilterMetaclass._get_search_fields(bases, dict(attrs))
         self.assertEqual(len(search_fields), 9)
 
-        expected_fields = ["fieldA", "fa", "fieldB", "fb",
-                           "fieldZ", "field2", "field1", "sharedfield", "s"]
+        expected_fields = ["fieldA", "fa", "fieldZ", "fieldB", "fb",
+                           "field2", "field1", "sharedfield", "s"]
         self.assertEqual(list(search_fields.keys()), expected_fields)
 
 
 class DefaultFieldsTests(BaseFilterTest):
-    def setUp(self):
-        self.filterer = TestFilter()
-
-    def test_cache(self):
-        self.assertEqual(self.filterer._defaults, None)
-        self.assertEqual(len(self.filterer.default_fields), 3)
-        self.assertEqual(len(self.filterer._defaults), 3)
-
     def test_simple(self):
-        self.assertEqual(len(self.filterer.default_fields), 3)
+        self.assertEqual(len(self.filterer.get_default_fields()), 3)
 
-        default_keys = list(self.filterer.default_fields.keys())
+        default_keys = list(self.filterer.get_default_fields().keys())
         self.assertIn("id", default_keys)
         self.assertIn("email", default_keys)
         self.assertIn("@", default_keys)  # listens to aliases
 
     def test_no_reference(self):
-        """After instatiation, no field that is changed will be listened to"""
+        """After instantiation, no field that is changed will be listened to"""
         filter1 = TestFilter()
         filter2 = TestFilter()
 
@@ -167,7 +151,7 @@ class DefaultFieldsTests(BaseFilterTest):
         self.assertEqual(filter2.title.default, False)
 
         # both SearchField references are changed
-        # because they both are referencing the same instatiated Search Field
+        # because they both are referencing the same instantiated Search Field
         filter1.title.default = True
         self.assertEqual(filter1.title.default, True)
         self.assertEqual(filter2.title.default, True)
@@ -178,40 +162,95 @@ class DefaultFieldsTests(BaseFilterTest):
 
 
 class SplitTermsTests(BaseFilterTest):
-    def test_split_terms(self):
-        # no speicified field results in default search field
-        default_terms = ("email", "@", "id")
-        with mock_search_terms("Miles", "Davis"):
-            split_terms = self.filterer.split_terms(None)
-        self.assertEqual(split_terms, [(default_terms, "Miles"), (default_terms, "Davis")])
+    def setUp(self):
+        super(SplitTermsTests, self).setUp()
+        self.default_terms = ("email", "@", "id")
 
-        # grabs the specified field
-        with mock_search_terms(":contributor:Miles"):
-            split_terms = self.filterer.split_terms(None)
+    def run_split_terms(self, *terms):
+        with mock.patch("drf_search.filters.BaseSearchFilter._iter_search") as mock_iter:
+            mock_iter.return_value = iter(terms)
+            return self.filterer.split_terms(None)
+
+    def test_default_terms(self):
+        split_terms = self.run_split_terms((None, "Miles"), (None, "Davis"))
+        self.assertEqual(split_terms, [(self.default_terms, "Miles"), (self.default_terms, "Davis")])
+
+    def test_specified_fields(self):
+        split_terms = self.run_split_terms(("contributor", "Miles"))
         self.assertEqual(split_terms, [(("contributor",), "Miles")])
 
-        # mixed
-        with mock_search_terms(":contributor:Miles", "miles.davis@jazz.com"):
-            split_terms = self.filterer.split_terms(None)
-        self.assertEqual(split_terms, [(("contributor",), "Miles"), (default_terms, "miles.davis@jazz.com")])
+    def test_mixed(self):
+        split_terms = self.run_split_terms(("contributor", "Miles"), (None, "miles.davis@jazz.com"))
+        self.assertEqual(split_terms, [(("contributor",), "Miles"), (self.default_terms, "miles.davis@jazz.com")])
 
-        # edge case
-        with mock_search_terms(":first  name:   Miles   "):
-            split_terms = self.filterer.split_terms(None)
-        self.assertEqual(split_terms, [(("first_name",), "Miles")])
+        split_terms = self.run_split_terms(("contributor", None), ("email", "miles.davis@jazz.com"))
+        self.assertEqual(split_terms, [(("email",), "miles.davis@jazz.com")])
+
+        split_terms = self.run_split_terms(("contributor", None), (None, "miles.davis@jazz.com"))
+        self.assertEqual(split_terms, [(self.default_terms, "miles.davis@jazz.com")])
+
+    def test_no_data(self):
+        split_terms = self.run_split_terms((None, None))
+        self.assertEqual(split_terms, [])
+
+
+class IterSearching(BaseFilterTest):
+    def run_iter_searching(self, *terms):
+        with mock_search_terms(*terms):
+            return list(self.filterer._iter_search(None))
+
+    def test_simple(self):
+        result = self.run_iter_searching("title: draft")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result, [("title", "draft")])
+
+    def test_comma_separation__specified(self):
+        result = self.run_iter_searching("title: draft", "email: boris.badguy@example.com")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [("title", "draft"), ("email", "boris.badguy@example.com")])
+
+    def test_comma_separation__mixed(self):
+        result = self.run_iter_searching("draft", "email: boris.badguy@example.com")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [(None, "draft"), ("email", "boris.badguy@example.com")])
+
+    def test_no_commas__specified(self):
+        result = self.run_iter_searching("title: draft email: boris.badguy@example.com")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [("title", "draft"), ("email", "boris.badguy@example.com")])
+
+    def test_no_commas__mixed(self):
+        result = self.run_iter_searching("draft email: boris.badguy@example.com")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [(None, "draft"), ("email", "boris.badguy@example.com")])
+
+    def test_no_term__first(self):
+        result = self.run_iter_searching("title: email: boris.badguy@example.com")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [("title", None), ("email", "boris.badguy@example.com")])
+
+    def test_no_term__last(self):
+        result = self.run_iter_searching("title: draft email: ")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [("title", "draft"), ("email", None)])
+
+    def test_no_term__both(self):
+        result = self.run_iter_searching("title: email: ")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [("title", None), ("email", None)])
 
 
 class ValidateFieldsTests(BaseFilterTest):
     def test_simple(self):
         search_fields = ("id", "title", "email")
 
-        valid_fields = self.filterer._validate_fields(search_fields, "abcd")
+        valid_fields = list(self.filterer._validate_fields(search_fields, "abcd"))
         self.assertEqual(len(valid_fields), 2)
         field_names = self._get_field_names(valid_fields)
         self.assertIn("user__email", field_names)
         self.assertIn("title", field_names)
 
-        valid_fields = self.filterer._validate_fields(search_fields, "123")
+        valid_fields = list(self.filterer._validate_fields(search_fields, "123"))
         self.assertEqual(len(valid_fields), 2)
 
         field_names = self._get_field_names(valid_fields)
@@ -220,44 +259,44 @@ class ValidateFieldsTests(BaseFilterTest):
 
     def test_aliases(self):
         search_fields = ("id", "@")
-        valid_fields = self.filterer._validate_fields(search_fields, "abcd")
+        valid_fields = list(self.filterer._validate_fields(search_fields, "abcd"))
         self.assertEqual(len(valid_fields), 1)
         self.assertEqual(self._get_field_names(valid_fields), ["user__email"])
 
     def test_aliases__multiple_references(self):
-        """Only returns one SearchField instance with two aliases"""
+        """Returns all instance of valid SearchFields, including duplicates via aliases"""
         search_fields = ("id", "@", "email")
-        valid_fields = self.filterer._validate_fields(search_fields, "miles.davis@jazz.com")
-        self.assertEqual(len(valid_fields), 1)
-        self.assertEqual(self._get_field_names(valid_fields), ["user__email"])
+        valid_fields = list(self.filterer._validate_fields(search_fields, "miles.davis@jazz.com"))
+        self.assertEqual(len(valid_fields), 2)
+        self.assertEqual(self._get_field_names(valid_fields), ["user__email", "user__email"])
 
     def test_bad_field(self):
-        with six.assertRaisesRegex(self, AttributeError, "Field 'jazz' is not searchable"):
-            self.filterer._validate_fields(("id", "@", "jazz"), "abcd")
+        with six.assertRaisesRegex(self, NotFound, "Field 'jazz' is not searchable"):
+            list(self.filterer._validate_fields(("id", "@", "jazz"), "abcd"))
 
 
 class FilterSearchingTests(BaseFilterTest):
     def test_simple(self):
-        split_terms = [(("email",), "Miles"), (("title",), "Davis")]
+        split_terms = [(("email", "title"), "Miles"), (("title",), "Davis")]
         result = self.run_filter_searching(*split_terms)
         self.assertEqual(len(result), 2)
-        self.assertIn(("user__email__icontains", "Miles"), result)
-        self.assertIn(("title__icontains", "Davis"), result)
+        self.assertIn(("Miles", {"user__email__icontains", "title__icontains"}), result)
+        self.assertIn(("Davis", {"title__icontains"}), result)
 
     def test_aliases(self):
         split_terms = [(("email", "@"), "Miles"), (("title",), "Davis")]
         result = self.run_filter_searching(*split_terms)
         self.assertEqual(len(result), 2)
-        self.assertIn(("user__email__icontains", "Miles"), result)
-        self.assertIn(("title__icontains", "Davis"), result)
+        self.assertIn(("Miles", {"user__email__icontains"}), result)
+        self.assertIn(("Davis", {"title__icontains"}), result)
 
     def test_bad_validation(self):
         split_terms = [(("id",), "Miles"), (("title",), "Davis")]
         result = self.run_filter_searching(*split_terms)
         self.assertEqual(len(result), 1)
-        self.assertIn(("title__icontains", "Davis"), result)
+        self.assertIn(("Davis", {"title__icontains"}), result)
 
     def test_error(self):
         split_terms = [(("id",), "Miles"), (("jazz",), "Davis")]
-        with six.assertRaisesRegex(self, AttributeError, "Field 'jazz' is not searchable"):
+        with six.assertRaisesRegex(self, NotFound, "Field 'jazz' is not searchable"):
             self.run_filter_searching(*split_terms)

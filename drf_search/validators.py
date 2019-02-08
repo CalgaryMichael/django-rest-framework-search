@@ -11,6 +11,10 @@ import json
 EMAIL_REGEX = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
 
+def validate_string(x):
+    return not x.isdigit()
+
+
 def validate_numerical(x):
     if isinstance(x, int):
         return True
@@ -20,16 +24,16 @@ def validate_numerical(x):
 
 
 def validate_list(x):
-    if isinstance(x, list):
-        return True
     if isinstance(x, six.string_types):
         try:
             x = json.loads(x)
-            if isinstance(x, list):
-                return True
         except:
             return False
-    return False
+    try:
+        list(x)
+    except TypeError:
+        return False
+    return True
 
 
 def validate_boolean(x):

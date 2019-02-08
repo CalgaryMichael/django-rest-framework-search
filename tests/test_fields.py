@@ -4,7 +4,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import unittest
 from mock import patch
 from drf_search import fields, validators
 from django.test import TestCase
@@ -119,28 +118,35 @@ class ExactSearchFieldTests(TestCase):
         self.assertEqual(field.field_lookup, "iexact")
 
 
-class ContainsSearchFieldTests(TestCase):
+class StringSearchFieldTests(TestCase):
     def test_simple(self):
         # basic, no frills
-        field = fields.ContainsSearchField("pk")
+        field = fields.StringSearchField("pk")
         self.assertEqual(field.field_name, "pk")
-        self.assertEqual(field.match_case, False)
+        self.assertEqual(field.match_case, None)
         self.assertEqual(field.field_lookup, "icontains")
 
         # changes with match_case
-        field = fields.ContainsSearchField("pk", match_case=True)
+        field = fields.StringSearchField("pk", match_case=True)
         self.assertEqual(field.field_name, "pk")
         self.assertEqual(field.match_case, True)
         self.assertEqual(field.field_lookup, "contains")
 
     def test_field_lookup(self):
-        field = fields.ContainsSearchField("pk", field_lookup="exact")
-        self.assertEqual(field.match_case, False)
-        self.assertEqual(field.field_lookup, "icontains")
+        field = fields.StringSearchField("pk", field_lookup="exact")
+        self.assertEqual(field.match_case, None)
+        self.assertEqual(field.field_lookup, "exact")
 
-        field = fields.ContainsSearchField("pk", field_lookup="exact", match_case=True)
+        field = fields.StringSearchField("pk", field_lookup="exact", match_case=True)
         self.assertEqual(field.match_case, True)
-        self.assertEqual(field.field_lookup, "contains")
+        self.assertEqual(field.field_lookup, "exact")
+
+    def test_is_valid(self):
+        field = fields.StringSearchField("pk")
+        self.assertTrue(field.is_valid("miles"))
+        self.assertTrue(field.is_valid("miles.davis"))
+        self.assertTrue(field.is_valid("miles.davis@draft2digital247.com"))
+        self.assertFalse(field.is_valid("123"))
 
 
 class RegexSearchFieldTests(TestCase):
@@ -167,39 +173,54 @@ class RegexSearchFieldTests(TestCase):
         self.assertEqual(field.field_lookup, "iregex")
 
 
-class RegexSearchFieldTests(TestCase):
+class EmailSearchFieldTests(TestCase):
     def test_simple(self):
         # basic, no frills
         field = fields.EmailSearchField("email")
         self.assertEqual(field.field_name, "email")
         self.assertEqual(field.match_case, False)
-        self.assertEqual(field.field_lookup, "icontains")
-        self.assertEqual(len(field._validators), 1)
+        self.assertEqual(field.field_lookup, "iexact")
+        self.assertEqual(len(field._validators), 2)
 
         # changes with match_case and partial
         field = fields.EmailSearchField("email", match_case=True, partial=True)
         self.assertEqual(field.field_name, "email")
         self.assertEqual(field.match_case, True)
         self.assertEqual(field.field_lookup, "contains")
-        self.assertEqual(len(field._validators), 0)
+        self.assertEqual(len(field._validators), 1)
 
     def test_field_lookup(self):
-        field = fields.EmailSearchField("email", field_lookup="exact")
+        field = fields.EmailSearchField("email", match_case=False, partial=False)
+        self.assertEqual(field.match_case, False)
+        self.assertEqual(field.field_lookup, "iexact")
+
+        field = fields.EmailSearchField("email", match_case=True, partial=False)
+        self.assertEqual(field.match_case, True)
+        self.assertEqual(field.field_lookup, "exact")
+
+        field = fields.EmailSearchField("email", match_case=False, partial=True)
         self.assertEqual(field.match_case, False)
         self.assertEqual(field.field_lookup, "icontains")
 
-        field = fields.EmailSearchField("email", field_lookup="exact", match_case=True)
+        field = fields.EmailSearchField("email", match_case=True, partial=True)
         self.assertEqual(field.match_case, True)
         self.assertEqual(field.field_lookup, "contains")
+
+        # does not listen to kwarg
+        field = fields.EmailSearchField("email", field_lookup="in")
+        self.assertEqual(field.match_case, False)
+        self.assertEqual(field.field_lookup, "iexact")
 
     def test_is_valid(self):
         field = fields.EmailSearchField("email")
         self.assertTrue(field.is_valid("miles.davis@jazz.com"))
         self.assertFalse(field.is_valid("miles.davis"))
+        self.assertFalse(field.is_valid("miles davis"))
 
         field = fields.EmailSearchField("email", partial=True)
         self.assertTrue(field.is_valid("miles.davis@jazz.com"))
         self.assertTrue(field.is_valid("miles.davis"))
+        self.assertFalse(field.is_valid("miles davis"))
 
 
 class IntegerSearchFieldTests(TestCase):
@@ -254,7 +275,7 @@ class BooleanSearchFieldTests(TestCase):
         self.assertTrue(field.is_valid("False"))
         self.assertFalse(field.is_valid("abc"))
 
-        field = fields.BooleanSearchField("pk", validators=lambda x: x == False)
+        field = fields.BooleanSearchField("pk", validators=lambda x: x is False)
         self.assertFalse(field.is_valid(True))
         self.assertFalse(field.is_valid("True"))
         self.assertTrue(field.is_valid(False))
